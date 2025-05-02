@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mi Cuenta | CBC</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #4361ee;
+            --cbc: #7209b7;
+            --danger: #f72585;
+            --success: #4cc9f0;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: #f5f7fa;
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        .user-container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+
+        .balance-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            text-align: center;
+            margin-bottom: 2rem;
+            border-left: 4px solid var(--cbc);
+        }
+
+        .balance-amount {
+            font-size: 2.5rem;
+            color: var(--cbc);
+            margin: 1rem 0;
+        }
+
+        .transactions {
+            background: white;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .transaction-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem;
+            border-bottom: 1px solid #eee;
+        }
+
+        .btn-logout {
+            background: var(--danger);
+            color: white;
+            padding: 0.5rem 1.5rem;
+            border-radius: 5px;
+            cursor: pointer;
+            border: none;
+        }
+
+        .action-buttons {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 2rem;
+            gap: 1rem;
+        }
+
+        .action-btn {
+            padding: 1rem 2rem;
+            font-size: 1rem;
+            font-weight: bold;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s;
+            flex: 1;
+            text-align: center;
+        }
+
+        .withdraw-btn {
+            background-color: var(--danger);
+            color: white;
+        }
+
+        .trading-btn {
+            background-color: var(--cbc);
+            color: white;
+        }
+
+        .deposit-btn {
+            background-color: var(--success);
+            color: white;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.7);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background-color: white;
+            padding: 2rem;
+            border-radius: 10px;
+            text-align: center;
+            max-width: 90%;
+            animation: fadeIn 0.3s;
+        }
+
+        .admin-number {
+            display: block;
+            margin: 1rem 0;
+            padding: 0.5rem;
+            background-color: #f0f0f0;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .admin-number:hover {
+            background-color: #e0e0e0;
+        }
+
+        .modal-title {
+            color: var(--cbc);
+            margin-bottom: 1.5rem;
+        }
+
+        .info-text {
+            margin-top: 1.5rem;
+            padding: 1rem;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            text-align: left;
+            border-left: 3px solid var(--cbc);
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+    <div class="user-container">
+        <div class="header">
+            <h1><i class="fas fa-wallet"></i> Mi Cuenta CBC</h1>
+            <button class="btn-logout" id="logoutBtn"><i class="fas fa-sign-out-alt"></i> Cerrar Sesión</button>
+        </div>
+
+        <div class="action-buttons">
+            <button class="action-btn deposit-btn" id="depositBtn"><i class="fas fa-coins"></i> Recargar CBC</button>
+            <button class="action-btn withdraw-btn" id="withdrawBtn"><i class="fas fa-hand-holding-usd"></i> Retirar CBC</button>
+            <button class="action-btn trading-btn" id="tradingBtn"><i class="fas fa-chart-line"></i> Trading!!!</button>
+        </div>
+
+        <div class="balance-card">
+            <h2><i class="fas fa-piggy-bank"></i> Saldo Disponible</h2>
+            <div class="balance-amount" id="balance">0 CBC</div>
+            <p><i class="far fa-clock"></i> Actualizado: <span id="updateDate">--/--/----</span></p>
+        </div>
+
+        <div class="transactions">
+            <h2><i class="fas fa-list"></i> Últimas Transacciones</h2>
+            <div id="transactionsList"></div>
+        </div>
+    </div>
+
+    <!-- Modal para retiro -->
+    <div class="modal" id="withdrawModal">
+        <div class="modal-content">
+            <h2 class="modal-title"><i class="fas fa-money-bill-wave"></i> Para retirar CBC escribele a uno de estos ADMINISTRADORES</h2>
+            <div class="admin-numbers">
+                <span class="admin-number" onclick="contactAdmin('+5354878729')"><i class="fab fa-whatsapp"></i> +5354878729</span>
+                <span class="admin-number" onclick="contactAdmin('+5363614496')"><i class="fab fa-whatsapp"></i> +5363614496</span>
+                <span class="admin-number" onclick="contactAdmin('+5353883894')"><i class="fab fa-whatsapp"></i> +5353883894</span>
+            </div>
+            <button class="btn-logout" onclick="closeModal()"><i class="fas fa-times"></i> Cerrar</button>
+            
+            <div class="info-text">
+                <p><i class="fas fa-info-circle"></i> <strong>Información Importante:</strong></p>
+                <p>📌 Tras realizar un retiro se cobrará un 10% de comisión para apoyar el trabajo de los administradores.</p>
+                <p>💡 <em>Recuerde... "CBC es el Futuro de Cuba"</em> 🇨🇺✨</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para recarga -->
+    <div class="modal" id="depositModal">
+        <div class="modal-content">
+            <h2 class="modal-title"><i class="fas fa-coins"></i> Para recargar CBC escribele a uno de estos ADMINISTRADORES</h2>
+            <div class="admin-numbers">
+                <span class="admin-number" onclick="contactAdmin('+5354878729')"><i class="fab fa-whatsapp"></i> +5354878729</span>
+                <span class="admin-number" onclick="contactAdmin('+5363614496')"><i class="fab fa-whatsapp"></i> +5363614496</span>
+                <span class="admin-number" onclick="contactAdmin('+5353883894')"><i class="fab fa-whatsapp"></i> +5353883894</span>
+            </div>
+            <button class="btn-logout" onclick="closeModal()"><i class="fas fa-times"></i> Cerrar</button>
+        </div>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+    
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyB3_jgunEavIbXhDfNa89giXITKqA8k22o",
+            authDomain: "sistema-51efc.firebaseapp.com",
+            projectId: "sistema-51efc",
+            storageBucket: "sistema-51efc.firebasestorage.app",
+            messagingSenderId: "950545396950",
+            appId: "1:950545396950:web:cff9ec4eb6b76516df0577",
+            measurementId: "G-3L0ST3XP6B"
+        };
+
+        const app = firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        // Funciones para los modales
+        document.getElementById('withdrawBtn').addEventListener('click', () => {
+            document.getElementById('withdrawModal').style.display = 'flex';
+        });
+
+        document.getElementById('depositBtn').addEventListener('click', () => {
+            document.getElementById('depositModal').style.display = 'flex';
+        });
+
+        document.getElementById('tradingBtn').addEventListener('click', () => {
+            window.location.href = 'trading.html';
+        });
+
+        function closeModal() {
+            document.getElementById('withdrawModal').style.display = 'none';
+            document.getElementById('depositModal').style.display = 'none';
+        }
+
+        function contactAdmin(phoneNumber) {
+            window.open(`https://wa.me/${phoneNumber}`, '_blank');
+        }
+
+        // Función para formatear el balance con 3 decimales
+        function formatBalance(balance) {
+            if (typeof balance !== 'number') {
+                balance = parseFloat(balance) || 0;
+            }
+            return balance.toFixed(3);
+        }
+
+        auth.onAuthStateChanged(async user => {
+            if(user) {
+                // Verificar si es admin
+                const userDoc = await db.collection("users").doc(user.uid).get();
+                if(userDoc.data().role === "admin" || user.email === "orelemcc17@gmail.com") {
+                    window.location.href = "admin.html";
+                    return;
+                }
+
+                // Cargar datos del usuario
+                loadUserData(user.uid);
+                loadTransactions(user.uid);
+            } else {
+                window.location.href = "index.html";
+            }
+        });
+
+        function loadUserData(userId) {
+            db.collection("users").doc(userId).onSnapshot(doc => {
+                const data = doc.data();
+                const formattedBalance = formatBalance(data.balance || 0);
+                document.getElementById("balance").textContent = `${formattedBalance} CBC`;
+                document.getElementById("updateDate").textContent = new Date().toLocaleDateString();
+            });
+        }
+
+        function loadTransactions(userId) {
+            db.collection("transactions")
+                .where("userId", "==", userId)
+                .orderBy("timestamp", "desc")
+                .limit(5)
+                .onSnapshot(snapshot => {
+                    const container = document.getElementById("transactionsList");
+                    container.innerHTML = "";
+                    
+                    snapshot.forEach(doc => {
+                        const transaction = doc.data();
+                        const item = document.createElement("div");
+                        item.className = "transaction-item";
+                        item.innerHTML = `
+                            <div>
+                                <h3>${transaction.type === 'add' ? '<i class="fas fa-plus-circle"></i> Recarga' : '<i class="fas fa-minus-circle"></i> Retiro'}</h3>
+                                <small><i class="far fa-clock"></i> ${new Date(transaction.timestamp?.toDate()).toLocaleString()}</small>
+                            </div>
+                            <div style="color: ${transaction.type === 'add' ? 'green' : 'red'}">
+                                ${transaction.type === 'add' ? '+' : '-'}${formatBalance(transaction.amount)} CBC
+                            </div>
+                        `;
+                        container.appendChild(item);
+                    });
+                });
+        }
+
+        document.getElementById("logoutBtn").addEventListener("click", () => {
+            auth.signOut();
+        });
+    </script>
+</body>
+</html>

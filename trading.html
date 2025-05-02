@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CBC</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #121212;
+            color: white;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .container {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            width: 100%;
+            overflow: hidden;
+        }
+        
+        .header {
+            padding: 15px;
+            background-color: #1e1e1e;
+            text-align: center;
+            border-bottom: 1px solid #333;
+            position: relative;
+            flex-shrink: 0;
+        }
+        
+        .info {
+            padding: 10px 15px;
+            text-align: center;
+            background-color: #252525;
+            border-bottom: 1px solid #333;
+            flex-shrink: 0;
+        }
+        
+        .chart-container {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            min-height: 200px;
+        }
+        
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+        
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            padding: 15px;
+            background-color: #1e1e1e;
+            border-top: 1px solid #333;
+            flex-shrink: 0;
+        }
+        
+        .button {
+            padding: 15px 20px;
+            font-size: 16px;
+            font-weight: bold;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            width: 48%;
+            text-align: center;
+        }
+        
+        .buy {
+            background-color: #4CAF50;
+            color: white;
+        }
+        
+        .sell {
+            background-color: #F44336;
+            color: white;
+        }
+        
+        .return-btn {
+            position: absolute;
+            right: 20px;
+            top: 15px;
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            text-decoration: none;
+        }
+        
+        .profit {
+            font-size: 20px;
+            font-weight: bold;
+            margin: 5px 0;
+            display: inline-block;
+        }
+        
+        .positive {
+            color: #4CAF50;
+        }
+        
+        .negative {
+            color: #F44336;
+        }
+        
+        .neutral {
+            color: white;
+        }
+        
+        .horizontal-line {
+            position: absolute;
+            width: 100%;
+            height: 1px;
+            background-color: rgba(255, 255, 255, 0.5);
+            z-index: 10;
+            display: none;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.7);
+            z-index: 100;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .modal-content {
+            background-color: #1e1e1e;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            max-width: 80%;
+        }
+        
+        .modal-close {
+            margin-top: 15px;
+            padding: 8px 15px;
+            background-color: #F44336;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        
+        .disabled {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>CBC - Trading</h1>
+            <a href="usuario.html" class="return-btn">Regresar</a>
+        </div>
+        
+        <div class="info">
+            <div>Saldo: <span class="profit neutral" id="balance">$0.00</span></div>
+            <div>Ganancia/Pérdida: <span class="profit neutral" id="profit">$0.00</span></div>
+        </div>
+        
+        <div class="chart-container">
+            <canvas id="chart"></canvas>
+            <div class="horizontal-line" id="horizontal-line"></div>
+        </div>
+        
+        <div class="controls">
+            <button class="button buy" id="buy-btn">COMPRAR</button>
+            <button class="button sell" id="sell-btn">VENDER</button>
+        </div>
+    </div>
+
+    <div class="modal" id="insufficientBalanceModal">
+        <div class="modal-content">
+            <h2>Saldo Insuficiente</h2>
+            <p>No tienes suficiente saldo para realizar esta operación.</p>
+            <button class="modal-close" id="closeModal">Cerrar</button>
+        </div>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+    
+    <script>
+        // Configuración inicial
+        const canvas = document.getElementById('chart');
+        const ctx = canvas.getContext('2d');
+        const buyBtn = document.getElementById('buy-btn');
+        const sellBtn = document.getElementById('sell-btn');
+        const balanceDisplay = document.getElementById('balance');
+        const profitDisplay = document.getElementById('profit');
+        const horizontalLine = document.getElementById('horizontal-line');
+        const insufficientBalanceModal = document.getElementById('insufficientBalanceModal');
+        
+        // Configuración de Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyB3_jgunEavIbXhDfNa89giXITKqA8k22o",
+            authDomain: "sistema-51efc.firebaseapp.com",
+            projectId: "sistema-51efc",
+            storageBucket: "sistema-51efc.firebasestorage.app",
+            messagingSenderId: "950545396950",
+            appId: "1:950545396950:web:cff9ec4eb6b76516df0577",
+            measurementId: "G-3L0ST3XP6B"
+        };
+
+        // Inicializar Firebase
+        const app = firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        // Variables de estado
+        let candles = [];
+        let currentValue = 100;
+        let isRunning = false;
+        let positionOpen = false;
+        let positionType = null;
+        let entryPrice = 0;
+        let userBalance = 0;
+        let profit = 0;
+        let animationId = null;
+        let lastTimestamp = 0;
+        let dataPoints = 0;
+        let candleWidth = 10;
+        let candleSpacing = 2;
+        let userId = null;
+        let lastChangeTime = 0;
+        let changeInterval = 800;
+
+        // Tamaño del canvas
+        function resizeCanvas() {
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+            initializeData();
+            drawChart();
+        }
+        
+        window.addEventListener('resize', resizeCanvas);
+        
+        // Inicializar datos con velas japonesas
+        function initializeData() {
+            candles = [];
+            const numCandles = Math.floor(canvas.width / (candleWidth + candleSpacing));
+            for (let i = 0; i < numCandles; i++) {
+                candles.push(createCandle(currentValue));
+            }
+        }
+        
+        function createCandle(baseValue) {
+            const open = baseValue;
+            const change = (Math.random() - 0.5) * 8;
+            const close = open + change;
+            const high = Math.max(open, close) + Math.random() * 10;
+            const low = Math.min(open, close) - Math.random() * 10;
+            
+            return {
+                open: open,
+                high: high,
+                low: low,
+                close: close,
+                isUp: close >= open
+            };
+        }
+        
+        // Generar movimiento aleatorio
+        function randomMovement(timestamp) {
+            if (!lastTimestamp) lastTimestamp = timestamp;
+            const deltaTime = timestamp - lastTimestamp;
+            
+            if (deltaTime > changeInterval) {
+                const change = (Math.random() - 0.5) * 8;
+                currentValue += change;
+                
+                if (currentValue < 50) currentValue = 50;
+                if (currentValue > 150) currentValue = 150;
+                
+                candles.push(createCandle(currentValue));
+                if (candles.length > Math.floor(canvas.width / (candleWidth + candleSpacing))) {
+                    candles.shift();
+                }
+                
+                if (positionOpen) {
+                    const diff = currentValue - entryPrice;
+                    if (positionType === 'buy') {
+                        profit = diff > 0 ? 
+                            (diff > 2 ? diff * 100 : diff * 30) : 
+                            (diff < -2 ? diff * 110 : diff * 32);
+                    } else {
+                        profit = diff < 0 ? 
+                            (diff < -2 ? -diff * 100 : -diff * 30) : 
+                            (diff > 2 ? -diff * 110 : -diff * 32);
+                    }
+                    
+                    updateProfitDisplay();
+                    
+                    if (userBalance + profit <= 0) {
+                        closePosition();
+                        showInsufficientBalance();
+                    }
+                }
+                
+                lastTimestamp = timestamp;
+                dataPoints++;
+            }
+        }
+        
+        // Cerrar posición automáticamente
+        function closePosition() {
+            positionOpen = false;
+            userBalance = Math.max(0, userBalance + profit);
+            updateBalanceInFirebase(userBalance);
+            
+            horizontalLine.style.display = 'none';
+            buyBtn.textContent = 'COMPRAR';
+            sellBtn.textContent = 'VENDER';
+            
+            updateBalanceDisplay();
+        }
+        
+        // Dibujar el gráfico de velas japonesas
+        function drawChart() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+            ctx.beginPath();
+            ctx.moveTo(0, canvas.height / 2);
+            ctx.lineTo(canvas.width, canvas.height / 2);
+            ctx.stroke();
+            
+            const candleAreaHeight = canvas.height * 0.8;
+            const priceRange = 100;
+            const priceToY = (price) => canvas.height - ((price - 50) / priceRange) * candleAreaHeight - (canvas.height - candleAreaHeight)/2;
+            
+            candles.forEach((candle, index) => {
+                const x = index * (candleWidth + candleSpacing);
+                const openY = priceToY(candle.open);
+                const closeY = priceToY(candle.close);
+                const highY = priceToY(candle.high);
+                const lowY = priceToY(candle.low);
+                
+                ctx.fillStyle = candle.isUp ? '#4CAF50' : '#F44336';
+                ctx.fillRect(x, Math.min(openY, closeY), candleWidth, Math.abs(closeY - openY));
+                
+                ctx.strokeStyle = candle.isUp ? '#4CAF50' : '#F44336';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(x + candleWidth/2, highY);
+                ctx.lineTo(x + candleWidth/2, Math.min(openY, closeY));
+                ctx.stroke();
+                
+                ctx.beginPath();
+                ctx.moveTo(x + candleWidth/2, lowY);
+                ctx.lineTo(x + candleWidth/2, Math.max(openY, closeY));
+                ctx.stroke();
+            });
+        }
+        
+        // Bucle de animación
+        function animate(timestamp) {
+            randomMovement(timestamp);
+            drawChart();
+            
+            if (dataPoints % 10 === 0 && candles.length >= Math.floor(canvas.width / (candleWidth + candleSpacing))) {
+                canvas.style.transform = `translateX(-${dataPoints % 20}px)`;
+            }
+            
+            if (isRunning) {
+                animationId = requestAnimationFrame(animate);
+            }
+        }
+        
+        // Actualizar display de ganancias
+        function updateProfitDisplay() {
+            profitDisplay.textContent = `$${profit.toFixed(2)}`;
+            profitDisplay.className = profit > 0 ? 'profit positive' : profit < 0 ? 'profit negative' : 'profit neutral';
+        }
+        
+        // Actualizar display de saldo
+        function updateBalanceDisplay() {
+            balanceDisplay.textContent = `$${userBalance.toFixed(2)}`;
+            balanceDisplay.className = userBalance > 0 ? 'profit positive' : 'profit negative';
+            
+            if (userBalance > 0) {
+                buyBtn.classList.remove('disabled');
+                sellBtn.classList.remove('disabled');
+            } else {
+                buyBtn.classList.add('disabled');
+                sellBtn.classList.add('disabled');
+            }
+        }
+        
+        // Mostrar modal de saldo insuficiente
+        function showInsufficientBalance() {
+            insufficientBalanceModal.style.display = "flex";
+        }
+        
+        // Cerrar modal
+        document.getElementById("closeModal").addEventListener("click", () => {
+            insufficientBalanceModal.style.display = "none";
+        });
+        
+        // Manejar compra/venta
+        function handleTrade(type) {
+            if (userBalance <= 0) {
+                showInsufficientBalance();
+                return;
+            }
+            
+            if (!positionOpen) {
+                positionOpen = true;
+                positionType = type;
+                entryPrice = currentValue;
+                profit = 0;
+                
+                horizontalLine.style.display = 'block';
+                const yPos = canvas.height - (entryPrice - 50) * canvas.height / 100;
+                horizontalLine.style.top = `${yPos}px`;
+                
+                buyBtn.textContent = type === 'buy' ? 'CERRAR COMPRA' : 'COMPRAR';
+                sellBtn.textContent = type === 'sell' ? 'CERRAR VENTA' : 'VENDER';
+                
+                if (!isRunning) {
+                    isRunning = true;
+                    lastTimestamp = 0;
+                    animationId = requestAnimationFrame(animate);
+                }
+            } else {
+                closePosition();
+            }
+        }
+        
+        // Actualizar saldo en Firebase
+        function updateBalanceInFirebase(newBalance) {
+            if (userId) {
+                db.collection("users").doc(userId).update({
+                    balance: newBalance
+                });
+            }
+        }
+        
+        // Cargar datos del usuario en tiempo real
+        function loadUserData(userId) {
+            db.collection("users").doc(userId).onSnapshot(doc => {
+                if (doc.exists) {
+                    const data = doc.data();
+                    userBalance = data.balance || 0;
+                    updateBalanceDisplay();
+                }
+            });
+        }
+        
+        // Verificar autenticación
+        auth.onAuthStateChanged(async user => {
+            if (user) {
+                userId = user.uid;
+                
+                // Verificar si viene de usuario.html
+                const referrer = document.referrer;
+                if (!referrer.includes('usuario.html')) {
+                    window.location.href = 'usuario.html';
+                    return;
+                }
+                
+                // Verificar si es admin
+                const userDoc = await db.collection("users").doc(userId).get();
+                if (userDoc.exists && (userDoc.data().role === "admin" || user.email === "orelemcc17@gmail.com")) {
+                    window.location.href = "admin.html";
+                    return;
+                }
+                
+                // Cargar datos del usuario
+                loadUserData(userId);
+                
+                // Iniciar simulación
+                resizeCanvas();
+                isRunning = true;
+                animationId = requestAnimationFrame(animate);
+            } else {
+                window.location.href = "index.html";
+            }
+        });
+        
+        // Event listeners
+        buyBtn.addEventListener('click', () => handleTrade('buy'));
+        sellBtn.addEventListener('click', () => handleTrade('sell'));
+
+        // Forzar visibilidad al cargar
+        window.addEventListener('DOMContentLoaded', () => {
+            buyBtn.style.opacity = 1;
+            sellBtn.style.opacity = 1;
+            resizeCanvas();
+        });
+    </script>
+</body>
+</html>
